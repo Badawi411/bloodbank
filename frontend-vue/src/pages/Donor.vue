@@ -1,5 +1,6 @@
 <script setup>
 import Navbar from '@/components/Navbar.vue';
+import AppFooter from '@/components/AppFooter.vue';
 import { ref } from 'vue';
 import { useFormStore } from '@/stores/formStore';
 
@@ -48,6 +49,7 @@ const virusTestResults = ['Negative', 'Positive'];
 
 const handleDonorSubmit = async () => {
   formStore.loading = true;
+
   try {
     const response = await fetch(
       'http://localhost:5000/api/v1/donors/register',
@@ -58,12 +60,18 @@ const handleDonorSubmit = async () => {
       }
     );
     const data = await response.json();
+    if (!data.donor && formStore.donorForm.nationalId) {
+      formStore.donorExists = false; // Explicitly set to false
+      return;
+    }
     if (!response.ok) {
+      // formStore.donorExists = null;
       throw new Error(data.message || 'Failed to register donor');
     }
+
     if (data.status === 'rejected') {
       formStore.rejectedMessage = data.message;
-      formStore.activeStep = 3;
+      formStore.activeStep = 1;
       return;
     }
     if (response.status === 200 && data.donor) {
@@ -115,12 +123,12 @@ const handleDonationSubmit = async () => {
 
 <template>
   <Navbar />
-  <v-container class="py-10" style="background-color: white" fluid>
-    <v-card class="mx-auto" max-width="1000" elevation="3">
+  <v-container class="py-10" fluid style="background-color: white">
+    <v-card class="mx-auto" elevation="3" max-width="1000">
       <v-card-title class="text-h5 font-weight-bold text-center">
         Blood Donation Process
       </v-card-title>
-      <v-divider></v-divider>
+      <v-divider />
       <v-card-text>
         <v-stepper v-model="formStore.activeStep" flat>
           <v-stepper-header
@@ -128,9 +136,9 @@ const handleDonationSubmit = async () => {
             style="height: 60px"
           >
             <v-stepper-step
+              class="d-flex align-center justify-center w-50 px-0 spacing-around"
               :complete="formStore.activeStep > 1"
               step="1"
-              class="d-flex align-center justify-center w-50 px-0 spacing-around"
             >
               <div
                 :class="[
@@ -145,11 +153,11 @@ const handleDonationSubmit = async () => {
               </div>
               <span class="text-center w-100">Donor Registration</span>
             </v-stepper-step>
-            <v-divider style="max-width: 250px; margin: 0 auto"></v-divider>
+            <v-divider style="max-width: 250px; margin: 0 auto" />
             <v-stepper-step
+              class="d-flex align-center justify-center w-50 px-0 spacing-around"
               :complete="formStore.activeStep > 2"
               step="2"
-              class="d-flex align-center justify-center w-50 px-0 spacing-around"
             >
               <div
                 :class="[
@@ -164,10 +172,10 @@ const handleDonationSubmit = async () => {
               </div>
               Donation Details
             </v-stepper-step>
-            <v-divider style="max-width: 250px; margin: 0 auto"></v-divider>
+            <v-divider style="max-width: 250px; margin: 0 auto" />
             <v-stepper-step
-              step="3"
               class="d-flex align-center justify-center w-50 px-0 spacing-around"
+              step="3"
             >
               <div
                 :class="[
@@ -185,47 +193,78 @@ const handleDonationSubmit = async () => {
           </v-stepper-header>
 
           <v-stepper-items>
+            <v-stepper-content :step="formStore.activeStep">
+              <v-alert
+                v-if="formStore.error"
+                class="text-center"
+                outlined
+                type="error"
+              >
+                {{ formStore.error }}
+              </v-alert>
+              <v-alert
+                v-else-if="formStore.rejectedMessage"
+                class="text-center"
+                outlined
+                type="error"
+              >
+                {{ formStore.rejectedMessage }}
+              </v-alert>
+              <v-alert
+                v-else-if="formStore.success"
+                class="text-center"
+                outlined
+                type="success"
+              >
+                Thank you for your donation! Your contribution will help save
+                lives.
+              </v-alert>
+            </v-stepper-content>
+
             <!-- Step 1: Donor Registration -->
-            <v-stepper-content step="1">
+            <v-stepper-content v-if="formStore.activeStep === 1" step="1">
               <v-form ref="donorFormRef" @submit.prevent="handleDonorSubmit">
                 <v-text-field
-                  label="National ID"
                   v-model="formStore.donorForm.nationalId"
-                  required
-                  outlined
                   dense
+                  name="nationalId"
+                  label="National ID"
+                  outlined
+                  required
                 ></v-text-field>
-                <v-text-field
-                  label="Full Name"
-                  v-model="formStore.donorForm.name"
-                  required
-                  outlined
-                  dense
-                  :readonly="formStore.donorExists === true"
-                ></v-text-field>
-                <v-select
-                  label="City"
-                  :items="cities"
-                  v-model="formStore.donorForm.city"
-                  required
-                  outlined
-                  dense
-                  :readonly="formStore.donorExists === true"
-                ></v-select>
-                <v-text-field
-                  label="Email"
-                  v-model="formStore.donorForm.email"
-                  required
-                  outlined
-                  dense
-                  :readonly="formStore.donorExists === true"
-                ></v-text-field>
+                <div v-if="formStore.donorExists === false">
+                  <v-text-field
+                    v-model="formStore.donorForm.name"
+                    dense
+                    label="Full Name"
+                    outlined
+                    :readonly="formStore.donorExists === true"
+                    required
+                  ></v-text-field>
+                  <v-select
+                    v-model="formStore.donorForm.city"
+                    dense
+                    :items="cities"
+                    label="City"
+                    outlined
+                    :readonly="formStore.donorExists === true"
+                    required
+                  ></v-select>
+                  <v-text-field
+                    v-model="formStore.donorForm.email"
+                    dense
+                    label="Email"
+                    outlined
+                    :readonly="formStore.donorExists === true"
+                    required
+                  ></v-text-field>
+                </div>
                 <v-btn
-                  type="submit"
-                  :loading="formStore.loading"
-                  color="primary"
                   block
                   class="mt-4"
+                  color="red-darken-4"
+                  :loading="formStore.loading"
+                  type="submit"
                 >
                   Continue
                 </v-btn>
@@ -233,73 +272,60 @@ const handleDonationSubmit = async () => {
             </v-stepper-content>
 
             <!-- Step 2: Donation Details -->
-            <v-stepper-content step="2">
+            <v-stepper-content v-if="formStore.activeStep === 2" :step="2">
               <v-form
                 ref="donationFormRef"
                 @submit.prevent="handleDonationSubmit"
               >
                 <v-select
-                  label="Blood Type"
-                  :items="bloodTypes"
                   v-model="formStore.donationForm.bloodType"
-                  required
-                  outlined
                   dense
+                  :items="bloodTypes"
+                  label="Blood Type"
+                  outlined
+                  required
                 ></v-select>
                 <v-select
-                  label="Virus Test Result"
-                  :items="virusTestResults"
                   v-model="formStore.donationForm.virusTestResult"
-                  required
-                  outlined
                   dense
+                  :items="virusTestResults"
+                  label="Virus Test Result"
+                  outlined
+                  required
                 ></v-select>
                 <v-select
-                  label="Blood Bank City"
-                  :items="cities"
                   v-model="formStore.donationForm.bloodBankCity"
-                  required
-                  outlined
                   dense
+                  :items="cities"
+                  label="Blood Bank City"
+                  outlined
+                  required
                 ></v-select>
                 <v-btn
-                  type="submit"
-                  :loading="formStore.loading"
-                  color="primary"
                   block
                   class="mt-4"
+                  color="red-darken-4"
+                  :loading="formStore.loading"
+                  type="submit"
                 >
                   Submit Donation
                 </v-btn>
               </v-form>
             </v-stepper-content>
 
-            <!-- Step 3: Confirmation -->
-            <v-stepper-content step="3">
-              <v-alert
-                type="success"
-                v-if="formStore.success"
-                class="text-center"
-                outlined
-              >
-                Thank you for your donation! Your contribution will help save
-                lives.
-              </v-alert>
-              <v-alert type="error" v-else class="text-center" outlined>
-                {{ formStore.error }}
-              </v-alert>
-              <v-btn
-                @click="formStore.resetForms()"
-                color="primary"
-                block
-                class="mt-4"
-              >
-                Donate Again
-              </v-btn>
-            </v-stepper-content>
+            <v-btn
+              v-if="formStore.success"
+              block
+              class="mt-4"
+              color="red-darken-4"
+              @click="formStore.resetForms()"
+            >
+              Donate Again
+            </v-btn>
           </v-stepper-items>
         </v-stepper>
       </v-card-text>
     </v-card>
   </v-container>
+  <AppFooter />
 </template>

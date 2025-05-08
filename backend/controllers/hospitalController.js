@@ -4,9 +4,8 @@ const getCoordinates = require("../utils/coordinates");
 
 const Hospital = require("../models/hospitalRequestModel");
 
-exports.createHospitalRequest = catchAsync(async (req, res) => {
+exports.createHospitalRequest = catchAsync(async (req, res, next) => {
   const { hospitalName, bloodType, quantity, city, patientStatus } = req.body;
-
   if (!hospitalName || !bloodType || !quantity || !city || !patientStatus) {
     return next(new AppError("All fields are required", 400));
   }
