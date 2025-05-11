@@ -40,6 +40,10 @@ const donationSchema = new mongoose.Schema({
       return expirationDate;
     },
   },
+  expired: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 donationSchema.set("toJSON", {

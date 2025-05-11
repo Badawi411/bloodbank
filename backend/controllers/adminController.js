@@ -9,7 +9,9 @@ const Hospital = require("../models/hospitalRequestModel");
 const Donation = require("../models/donationModel");
 
 exports.getAllBloodStock = catchAsync(async (req, res, next) => {
-  const bloodStock = await BloodStock.find({ quantity: { $gt: 0 } });
+  const bloodStock = await BloodStock.find({
+    quantity: { $gt: 0 },
+  });
 
   if (!bloodStock) {
     return next(new AppError("No blood stock found", 404));
@@ -73,121 +75,6 @@ exports.getAllDonors = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.processRequests = catchAsync(async (req, res, next) => {
-  const hospitalRequests = await Hospital.find({
-    status: "Pending",
-  });
-
-  if (!hospitalRequests) {
-    return next(new AppError("No hospital requests found", 404));
-  }
-
-  if (hospitalRequests.length < 8) {
-    return next(
-      new AppError("The number of requests must be at least 10", 400)
-    );
-  }
-
-  hospitalRequests.sort((a, b) => {
-    const statusOrder = ["Immediate", "Urgent", "Normal"];
-    return (
-      statusOrder.indexOf(a.patientStatus) -
-      statusOrder.indexOf(b.patientStatus)
-    );
-  });
-
-  const bloodStock = await BloodStock.find();
-  if (!bloodStock) {
-    return next(new AppError("No blood stock found", 404));
-  }
-
-  const results = [];
-
-  for (const request of hospitalRequests) {
-    // Find blood stock for the requested blood type
-    const stocks = bloodStock.filter(
-      (stock) => stock.bloodType === request.bloodType
-    );
-
-    if (!stocks.length) {
-      results.push({
-        requestId: request._id,
-        success: false,
-        message: "Blood type not available",
-      });
-      continue;
-    }
-
-    // Find the closest blood stock based on distance
-    let closestStock = null;
-    let minDistance = Infinity;
-
-    for (const stock of stocks) {
-      const stockCoordinates = stock.location.coordinates;
-      const hospitalCoordinates = request.location.coordinates;
-      const distance = calculateDistance(
-        hospitalCoordinates[1],
-        hospitalCoordinates[0],
-        stockCoordinates[1],
-        stockCoordinates[0]
-      );
-
-      if (distance < minDistance && stock.quantity >= request.quantity) {
-        minDistance = distance;
-        closestStock = stock;
-      }
-    }
-
-    if (closestStock) {
-      // Deduct the requested quantity from the closest stock
-      closestStock.quantity -= request.quantity;
-
-      const donationsToRemove = closestStock.donations.slice(
-        0,
-        request.quantity
-      );
-      closestStock.donations = closestStock.donations.slice(request.quantity);
-
-      await BloodStock.findByIdAndUpdate(closestStock._id, {
-        quantity: closestStock.quantity,
-        donations: closestStock.donations,
-      });
-
-      for (const donation of donationsToRemove) {
-        await Donation.findByIdAndDelete(donation._id);
-      }
-
-      // Update the request status to "Accepted"
-      await Hospital.findByIdAndUpdate(request._id, {
-        status: "Accepted",
-      });
-
-      results.push({
-        requestId: request._id,
-        success: true,
-        message: "Request fulfilled",
-      });
-    } else {
-      await Hospital.findByIdAndUpdate(request._id, {
-        status: "Pending",
-      });
-
-      results.push({
-        requestId: request._id,
-        success: false,
-        message: "No nearby stock available",
-      });
-    }
-  }
-
-  res.status(200).json({
-    status: "success",
-    data: {
-      results,
-    },
-  });
-});
-
 exports.deleteExpiredBloodUnits = catchAsync(async (req, res, next) => {
   const donationId = req.params.donationId;
   const donation = await Donation.findById(donationId);
@@ -218,7 +105,7 @@ exports.deleteExpiredBloodUnits = catchAsync(async (req, res, next) => {
     await unit.save();
   }
   // Delete the donation
-  await Donation.findByIdAndDelete(donationId);
+  await Donation.findByIdAndUpdate(donationId, { expired: true });
 
   res.status(200).json({
     status: "success",

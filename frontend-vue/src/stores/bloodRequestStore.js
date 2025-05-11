@@ -1,5 +1,4 @@
 import { defineStore } from 'pinia';
-import { toRaw } from 'vue';
 
 export const useBloodRequestStore = defineStore('bloodRequest', {
   state: () => ({
@@ -21,8 +20,7 @@ export const useBloodRequestStore = defineStore('bloodRequest', {
       this.error = null;
       this.success = false;
 
-      const API_BASE_URL =
-        import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
 
       if (
         !this.requestForm.hospitalName ||
@@ -51,8 +49,7 @@ export const useBloodRequestStore = defineStore('bloodRequest', {
         this.success = true;
         this.resetForm();
       } catch (err) {
-        this.error =
-          err.message || 'Failed to submit request. Please try again.';
+        this.error = err.message || 'Failed to submit request. Please try again.';
         console.error(err);
       } finally {
         this.loading = false;

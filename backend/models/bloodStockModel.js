@@ -32,7 +32,7 @@ const bloodStockSchema = new mongoose.Schema({
 
 bloodStockSchema.pre("find", function (next) {
   const query = this.getQuery();
-  const match = {};
+  const match = { expired: false };
 
   if (query.city) match.city = query.city;
   if (query.bloodType) match.bloodType = query.bloodType;
@@ -44,7 +44,7 @@ bloodStockSchema.pre("find", function (next) {
       path: "donor",
       select: "email",
     },
-    select: "donor expirationDate",
+    select: "donor expirationDate expired",
   });
   next();
 });

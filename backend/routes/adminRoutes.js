@@ -10,7 +10,6 @@ router.get("/logout", authController.logout);
 router.use(authController.protect);
 router.use(authController.restrictTo("admin"));
 
-router.post("/process-requests", adminController.processRequests);
 router.get("/stock", adminController.getAllBloodStock);
 router.get("/hospitals-requests", adminController.getAllHospitalsRequests);
 router.get("/donors", adminController.getAllDonors);

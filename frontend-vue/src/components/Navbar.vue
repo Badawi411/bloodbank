@@ -1,18 +1,18 @@
 <script setup>
-import { ref } from 'vue'
+import { ref } from 'vue';
 
-const drawer = ref(false)
+const drawer = ref(false);
 
 const pages = [
-  { title: "Home", path: "/" },
-  { title: "Donate Blood", path: "/donor" },
-  { title: "Request Blood", path: "/hospital" },
-  { title: "Admin", path: "/admin" },
-]
+  { title: 'Home', path: '/' },
+  { title: 'Donate Blood', path: '/donor' },
+  { title: 'Request Blood', path: '/hospital' },
+  { title: 'Admin', path: '/admin' },
+];
 
 const toggleDrawer = () => {
-  drawer.value = !drawer.value
-}
+  drawer.value = !drawer.value;
+};
 </script>
 
 <template>
@@ -20,7 +20,10 @@ const toggleDrawer = () => {
     <v-container>
       <v-toolbar-title class="d-none d-md-flex me-4">
         <v-icon class="me-2">mdi-blood-bag</v-icon>
-        <RouterLink to="/" class="text-decoration-none text-white font-weight-bold">
+        <RouterLink
+          to="/"
+          class="text-decoration-none text-white font-weight-bold"
+        >
           BLOODBANK
         </RouterLink>
       </v-toolbar-title>
@@ -33,7 +36,11 @@ const toggleDrawer = () => {
       <!-- Drawer for Mobile -->
       <v-navigation-drawer v-model="drawer" temporary class="d-md-none">
         <v-list>
-          <v-list-item v-for="page in pages" :key="page.title" @click="toggleDrawer">
+          <v-list-item
+            v-for="page in pages"
+            :key="page.title"
+            @click="toggleDrawer"
+          >
             <RouterLink :to="page.path" class="text-decoration-none text-black">
               <v-list-item-title>{{ page.title }}</v-list-item-title>
             </RouterLink>
@@ -57,8 +64,6 @@ const toggleDrawer = () => {
     </v-container>
   </v-app-bar>
 </template>
-
-
 
 <style scoped>
 .text-decoration-none {

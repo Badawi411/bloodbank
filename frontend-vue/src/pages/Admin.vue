@@ -1,29 +1,74 @@
 <script setup>
-import { onMounted, ref, toRaw, reactive } from 'vue';
+import { computed, onMounted, reactive, ref, toRaw } from 'vue';
 import { useRouter } from 'vue-router';
 import Navbar from '@/components/Navbar.vue';
 import AppFooter from '@/components/AppFooter.vue';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 const router = useRouter();
-const tab = ref(0);
-// const donors = ref([]);
-// const requests = ref([]);
-// const stock = ref([]);
+const tab = ref('0');
+const donors = ref([]);
+const requests = ref([]);
+const stock = ref([]);
 const loading = ref(false);
 const username = ref('');
 const password = ref('');
 const token = ref(localStorage.getItem('token'));
+const dialog = ref(false);
+const selectedItem = ref(null);
+const selectedDonationIndex = ref(null);
 
 // blood stock headers
-const bloodStockHeaders = [
+const bloodStockHeaders = ref([
   { text: 'Blood Type', value: 'bloodType' },
   { text: 'Quantity', value: 'quantity' },
   { text: 'City', value: 'city' },
-  { text: 'Donor Name', value: 'donorName' },
-  { text: 'Expire Date', value: 'expireDate' },
-  { text: 'Status', value: 'status' },
-  { text: 'Actions', value: 'actions', sortable: false },
-];
+  { text: 'Donation Details', value: 'donationDetails' },
+]);
+
+const isExpired = (dateStr) => {
+  const today = new Date().toISOString().split('T')[0];
+  return dateStr < today;
+};
+
+const deleteDonation = async (item, index) => {
+  loading.value = true;
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/admin/${item._id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token.value}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to delete donation');
+    }
+    await fetchData(token.value, 'stock');
+  } catch (error) {
+    console.error('Error deleting donation:', error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const openDeleteDialog = (item, index) => {
+  selectedItem.value = item;
+  selectedDonationIndex.value = index;
+  console.log('Selected item:', selectedItem.value);
+  console.log('Selected index:', selectedDonationIndex.value);
+  dialog.value = true;
+};
+
+const confirmDelete = () => {
+  console.log('Selected item:', selectedItem.value);
+  console.log('Selected index:', selectedDonationIndex.value);
+  if (selectedItem.value && selectedDonationIndex.value !== null) {
+    deleteDonation(selectedItem.value, selectedDonationIndex.value);
+  }
+  dialog.value = false;
+};
 
 const hospitalRequestHeaders = [
   { text: 'Hospital Name', value: 'hospitalName' },
@@ -43,46 +88,33 @@ const donorHeaders = [
   { text: 'Last Donation Date', value: 'lastDonationDate' },
 ];
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-
-const fetchData = async function (authToken) {
+const fetchData = async function (authToken, details) {
   loading.value = true;
   try {
-    const [donorRes, requestRes, stockRes] = await Promise.all([
-      fetch(`${API_BASE_URL}/api/v1/admin/donors`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      }),
-      fetch(`${API_BASE_URL}/api/v1/admin/hospitals-requests`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      }),
-      fetch(`${API_BASE_URL}/api/v1/admin/stock`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-      }),
-    ]);
+    const response = await fetch(`${API_BASE_URL}/api/v1/admin/${details}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-    if (!donorRes.ok || !requestRes.ok || !stockRes.ok) {
+    if (!response.ok) {
       throw new Error('Failed to fetch data');
     }
 
-    // Assuming the API returns JSON data
+    const data = await response.json();
 
-    // donors.value = await donorRes.json();
-    // requests.value = await requestRes.json();
-    // stock.value = await stockRes.json();
-    // console.log(toRaw(stock.value).data.bloodStock);
+    if (details === 'stock') {
+      stock.value = data.data.bloodStock;
+      console.log(stock.value);
+    } else if (details === 'donors') {
+      donors.value = data.data.donors;
+      console.log(donors.value);
+    } else if (details === 'hospitals-requests') {
+      requests.value = data.data.hospitals;
+      console.log(requests.value);
+    }
   } catch (error) {
     console.error('Error fetching data:', error);
   } finally {
@@ -119,7 +151,7 @@ const handleLogin = async () => {
 
     username.value = '';
     password.value = '';
-    await fetchData(data.token);
+    await fetchData(data.token, 'stock');
   } catch (error) {
     console.error('Error logging in:', error);
   }
@@ -133,7 +165,8 @@ const handleLogout = () => {
 
 onMounted(() => {
   if (token.value) {
-    fetchData(token.value);
+    tab.value = '0';
+    fetchData(token.value, 'stock');
   }
 });
 </script>
@@ -141,30 +174,16 @@ onMounted(() => {
 <template>
   <Navbar />
 
-  <v-container class="py-10" v-if="!token">
+  <v-container v-if="!token" class="py-10">
     <v-row align="center" justify="center">
       <v-col cols="12" md="6">
         <v-card class="pa-5">
-          <v-card-title class="text-h5 text-center"
-            >Admin Dashboard</v-card-title
-          >
+          <v-card-title class="text-h5 text-center">Admin Dashboard</v-card-title>
           <v-card-text>
             <v-form>
-              <v-text-field
-                label="Username"
-                type="text"
-                v-model="username"
-                required
-              ></v-text-field>
-              <v-text-field
-                label="Password"
-                type="password"
-                v-model="password"
-                required
-              ></v-text-field>
-              <v-btn color="red-darken-4" block @click="handleLogin">
-                Login
-              </v-btn>
+              <v-text-field v-model="username" label="Username" required type="text" />
+              <v-text-field v-model="password" label="Password" required type="password" />
+              <v-btn block color="red-darken-4" @click="handleLogin"> Login </v-btn>
             </v-form>
           </v-card-text>
         </v-card>
@@ -183,66 +202,129 @@ onMounted(() => {
     </v-row>
 
     <v-tabs v-model="tab" background-color="primary" dark>
-      <v-tab value="0">Blood Stock</v-tab>
-      <v-tab value="1">Donors</v-tab>
-      <v-tab value="2">Hospital Requests</v-tab>
+      <v-tab value="0" @click="fetchData(token, 'stock')">Blood Stock</v-tab>
+      <v-tab value="1" @click="fetchData(token, 'donors')">Donors</v-tab>
+      <v-tab value="2" @click="fetchData(token, 'hospitals-requests')"> Hospital Requests</v-tab>
     </v-tabs>
 
     <v-tabs-items v-model="tab">
-      <v-tab-item value="0">
+      <v-tab-item v-if="tab === '0'" value="0">
         <v-card flat>
           <v-card-text>
-            <v-data-table class="elevation-1" />
-            <v-row>
-              <v-col cols="12">
-                <v-list>
-                  <v-list-item>
-                    <v-list-item-content>
-                      <div></div>
-                    </v-list-item-content>
-                  </v-list-item>
-                </v-list>
-              </v-col>
-            </v-row>
+            <v-list-item-title class="text-h5 mb-4">Blood Stock Management</v-list-item-title>
+            <v-data-table class="elevation-1" :headers="bloodStockHeaders" :items="stock">
+              <template #item.bloodType="{ item }">
+                <v-list-item-title class="text-h6">{{ item.bloodType }}</v-list-item-title>
+              </template>
+              <template #item.quantity="{ item }">
+                <v-list-item-title class="text-h6">{{ item.quantity }}</v-list-item-title>
+              </template>
+              <template #item.city="{ item }">
+                <v-list-item-title class="text-h6">{{ item.city }}</v-list-item-title>
+              </template>
+
+              <template #item.donationDetails="{ item }">
+                <v-row class="donation-card-container">
+                  <v-col
+                    v-for="(donation, index) in item.donations"
+                    :key="index"
+                    cols="12"
+                    lg="4"
+                    md="8"
+                  >
+                    <v-card
+                      class="pa-3"
+                      :class="
+                        isExpired(donation.expirationDate)
+                          ? 'bg-red-lighten-3'
+                          : 'bg-grey-lighten-1'
+                      "
+                      outlined
+                    >
+                      <v-card-title class="d-flex justify-space-between align-center">
+                        <div>
+                          <h5 class="headline mb-1">Donor: {{ donation.donor.name }}</h5>
+                          <h5 class="subheading">Expires: {{ donation.expirationDate }}</h5>
+                        </div>
+                        <v-btn
+                          v-if="isExpired(donation.expirationDate)"
+                          icon="mdi-delete"
+                          variant="text"
+                          @click="openDeleteDialog(donation, index)"
+                        />
+                      </v-card-title>
+                    </v-card>
+                  </v-col>
+                </v-row>
+              </template>
+            </v-data-table>
           </v-card-text>
         </v-card>
       </v-tab-item>
-      <!-- <v-tab-item value="1">
+      <v-tab-item v-if="tab === '2'" value="2">
         <v-card flat>
           <v-card-text>
-            <v-data-table
-              :headers="hospitalRequestHeaders"
-              :items="requests"
-              class="elevation-1"
-            ></v-data-table>
+            <v-list-item-title class="text-h5"> Hospital Requests Management </v-list-item-title>
+            <v-data-table class="elevation-1" :headers="hospitalRequestHeaders" :items="requests">
+              <template #item.hospitalName="{ item }">
+                <v-list-item-title class="text-h6">{{ item.hospitalName }}</v-list-item-title>
+              </template>
+              <template #item.bloodType="{ item }">
+                <v-list-item-title class="text-h6">{{ item.bloodType }}</v-list-item-title>
+              </template>
+              <template #item.quantity="{ item }">
+                <v-list-item-title class="text-h6">{{ item.quantity }}</v-list-item-title>
+              </template>
+              <template #item.city="{ item }">
+                <v-list-item-title class="text-h6">{{ item.city }}</v-list-item-title>
+              </template>
+              <template #item.patientStatus="{ item }">
+                <v-list-item-title class="text-h6">{{ item.patientStatus }}</v-list-item-title>
+              </template>
+              <template #item.requestDate="{ item }">
+                <v-list-item-title class="text-h6">{{ item.requestDate }}</v-list-item-title>
+              </template>
+              <template #item.status="{ item }">
+                <v-list-item-title class="text-h6">{{ item.status }}</v-list-item-title>
+              </template>
+            </v-data-table>
           </v-card-text>
         </v-card>
       </v-tab-item>
-      <v-tab-item>
+      <v-tab-item v-if="tab === '1'" value="1">
         <v-card flat>
           <v-card-text>
-            <v-data-table
-              :headers="donorHeaders"
-              :items="donors"
-              class="elevation-1"
-            ></v-data-table>
+            <v-list-item-title class="text-h5"> Donors Management </v-list-item-title>
+            <v-data-table class="elevation-1" :headers="donorHeaders" :items="donors">
+              <template #item.name="{ item }">
+                <v-list-item-title class="text-h6">{{ item.name }}</v-list-item-title>
+              </template>
+              <template #item.email="{ item }">
+                <v-list-item-title class="text-h6">{{ item.email }}</v-list-item-title>
+              </template>
+              <template #item.city="{ item }">
+                <v-list-item-title class="text-h6">{{ item.city }}</v-list-item-title>
+              </template>
+              <template #item.lastDonationDate="{ item }">
+                <v-list-item-title class="text-h6">{{ item.lastDonationDate }}</v-list-item-title>
+              </template>
+            </v-data-table>
           </v-card-text>
         </v-card>
-      </v-tab-item> -->
+      </v-tab-item>
     </v-tabs-items>
 
-    <!-- <v-dialog v-model="loading" persistent width="300">
-      <v-card color="primary" dark>
-        <v-card-text>
-          <v-row justify="center">
-            <v-progress-circular
-              indeterminate
-              color="white"
-            ></v-progress-circular>
-          </v-row>
-        </v-card-text>
+    <v-dialog v-model="dialog" max-width="400">
+      <v-card>
+        <v-card-title class="text-h6">Confirm Deletion</v-card-title>
+        <v-card-text>Are you sure you want to delete this donation?</v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn color="grey" text @click="dialog = false">Cancel</v-btn>
+          <v-btn color="red" text @click="confirmDelete">Delete</v-btn>
+        </v-card-actions>
       </v-card>
-    </v-dialog> -->
+    </v-dialog>
   </v-container>
   <AppFooter />
 </template>
@@ -250,5 +332,10 @@ onMounted(() => {
 <style scoped>
 h1 {
   margin: 0;
+}
+
+.donation-card-container {
+  display: flex;
+  flex-wrap: wrap;
 }
 </style>

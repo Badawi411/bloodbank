@@ -12,6 +12,7 @@ const hospitalRouter = require("./routes/hospitalRoutes");
 const adminRouter = require("./routes/adminRoutes");
 
 const globalErrorHandler = require("./utils/errorHandler");
+const processTenRequests = require("./jobs/processTenRequests");
 
 const app = express();
 
